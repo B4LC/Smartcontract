@@ -14,12 +14,11 @@ contract TradeFinance is Ownable {
     // Sales Contract Structure
     // agreement between buyer and seller
     struct salesContract {
+        uint id;
         string importer;
         string exporter;
         string issuingBank;
         string advisingBank;
-        address issuingBankAddress;
-        address advisingBankAddress;
         string commodity;
         string price;
         string paymentMethod;
@@ -29,6 +28,7 @@ contract TradeFinance is Ownable {
 
     // Letter of Credit Structure
     struct letterOfCredit {
+        uint id;
         uint salesContractID;
         string invoiceHash;
         string billOfExchangeHash;
@@ -88,28 +88,27 @@ contract TradeFinance is Ownable {
     function createSalesContract(
         string memory importer,
         string memory exporter,
-        string memory issuingBank,
-        string memory advisingBank,
-        address issuingBankAddress,
-        address advisingBankAddress,
+        uint issuingBankID,
+        uint advisingBankID,
         string memory commodity,
         string memory price,
         string memory paymentMethod,
         string memory additionalInfo,
         uint deadline
     ) public returns (uint salesContractID) {
+        (address issuingBankAddress, string memory issuingBank) = getBank(issuingBankID);
+        (address advisingBankAddress, string memory advisingBank) = getBank(advisingBankID);
         require(
             msg.sender == issuingBankAddress,
             "Only issuing bank can create new salescontract on blockchain"
         );
         salesContractID = numOfSalesContracts++;
         salesContracts[salesContractID] = salesContract(
+            salesContractID,
             importer,
             exporter,
             issuingBank,
             advisingBank,
-            issuingBankAddress,
-            advisingBankAddress,
             commodity,
             price,
             paymentMethod,
@@ -124,12 +123,9 @@ contract TradeFinance is Ownable {
         uint salesContractID,
         string memory startDate
     ) public returns (uint lcID) {
-        require(
-            msg.sender == salesContracts[salesContractID].issuingBankAddress,
-            "Only issuing bank can create a LC"
-        );
         lcID = numOfletterOfCredits++;
         letterOfCredits[lcID] = letterOfCredit(
+            lcID,
             salesContractID,
             "",
             "",
@@ -143,22 +139,12 @@ contract TradeFinance is Ownable {
 
     function approveLC(uint lcID) public returns (bool sucess) {
         letterOfCredit storage lc = letterOfCredits[lcID];
-        salesContract storage sc = salesContracts[lc.salesContractID];
-        require(
-            msg.sender == sc.advisingBankAddress,
-            "Only advissing bank can change this LC status."
-        );
         lc.lcStatus = "advising_bank_approved";
         return true;
     }
 
     function rejectLC(uint lcID) public returns (bool sucess) {
         letterOfCredit storage lc = letterOfCredits[lcID];
-        salesContract storage sc = salesContracts[lc.salesContractID];
-        require(
-            msg.sender == sc.advisingBankAddress,
-            "Only advissing bank can change this LC status."
-        );
         lc.lcStatus = "advising_bank_rejected";
         return true;
     }
@@ -169,11 +155,6 @@ contract TradeFinance is Ownable {
         string memory status
     ) public returns (bool success) {
         letterOfCredit storage lc = letterOfCredits[lcID];
-        salesContract storage sc = salesContracts[lc.salesContractID];
-        require(
-            msg.sender == sc.advisingBankAddress,
-            "Only advissing bank can change this LC status."
-        );
         lc.lcStatus = status;
         return true;
     }
@@ -186,12 +167,6 @@ contract TradeFinance is Ownable {
         string memory other
     ) public returns (bool success) {
         letterOfCredit storage lc = letterOfCredits[lcID];
-        salesContract storage sc = salesContracts[lc.salesContractID];
-        require(
-            (msg.sender == sc.advisingBankAddress) ||
-                (msg.sender == sc.issuingBankAddress),
-            "Only bank can upload these document."
-        );
         lc.invoiceHash = invoice;
         lc.billOfExchangeHash = exchange;
         lc.billOfLadingHash = lading;
