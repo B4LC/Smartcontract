@@ -2,14 +2,8 @@
 pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TradeFinance is Ownable {
+contract LoC is Ownable {
     // struct of parties & assets
-
-    // Bank Structure
-    struct bank {
-        string name;
-        address bankAddress;
-    }
 
     // Sales Contract Structure
     // agreement between buyer and seller
@@ -39,71 +33,42 @@ contract TradeFinance is Ownable {
     }
 
     // manage parties quantity
-    uint numOfBanks = 0;
     uint numOfSalesContracts = 0;
     uint numOfletterOfCredits = 0;
 
     // store parties
-    mapping(uint => bank) banks;
     mapping(uint => salesContract) salesContracts;
     mapping(uint => letterOfCredit) letterOfCredits;
 
     // Events
-    event BankAdded(uint bankID);
-    event SalesContractCreated(uint salesContractID);
-    event LcCreated(uint lcID, uint salesContractID);
-    event DocUploaded(uint lcID);
-
-    //add bank to contract
-    function addBank(
-        string memory name,
-        address bankAddress
-    ) public returns (uint bankID) {
-        bankID = numOfBanks++;
-        bank storage newBank = banks[bankID];
-        newBank.name = name;
-        newBank.bankAddress = bankAddress;
-        emit BankAdded(bankID);
-    }
-
-    function getAllBankAddress()
-        public
-        view
-        onlyOwner
-        returns (address[] memory)
-    {
-        address[] memory bankList = new address[](numOfBanks);
-        for (uint i = 0; i < numOfBanks; i++) {
-            bankList[i] = banks[i].bankAddress;
-        }
-        return bankList;
-    }
-
-    function getBank(
-        uint id
-    ) public view returns (address bankAddress, string memory name) {
-        bankAddress = banks[id].bankAddress;
-        name = banks[id].name;
-    }
+    event SalesContractCreated(
+        uint salesContractID, string importer, 
+        string exporter, string issuingBank, string advisingBank, 
+        string commodity, string price, string paymentMethod, 
+        string additionalInfo, uint deadline
+    );
+    event LcCreated(
+        uint lcID, uint salesContractID, string invoiceHash, 
+        string billOfExchangeHash, string billOfLadingHash, 
+        string otherDocHash, string lcStatus, string startDate
+    );
+    event LcApproved(uint lcID);
+    event LcRejected(uint lcID);
+    event LcStatusChanged(uint lcID, string status);
+    event DocUploaded(uint lcID, string invoice, string BoE, string BoL, string other);
 
     // create an agreement between buyer and seller
     function createSalesContract(
         string memory importer,
         string memory exporter,
-        uint issuingBankID,
-        uint advisingBankID,
+        string memory issuingBank,
+        string memory advisingBank,
         string memory commodity,
         string memory price,
         string memory paymentMethod,
         string memory additionalInfo,
         uint deadline
     ) public returns (uint salesContractID) {
-        (address issuingBankAddress, string memory issuingBank) = getBank(issuingBankID);
-        (address advisingBankAddress, string memory advisingBank) = getBank(advisingBankID);
-        require(
-            msg.sender == issuingBankAddress,
-            "Only issuing bank can create new salescontract on blockchain"
-        );
         salesContractID = numOfSalesContracts++;
         salesContracts[salesContractID] = salesContract(
             salesContractID,
@@ -117,7 +82,11 @@ contract TradeFinance is Ownable {
             additionalInfo,
             deadline
         );
-        emit SalesContractCreated(salesContractID);
+        emit SalesContractCreated(
+            salesContractID, importer, exporter, issuingBank, 
+            advisingBank, commodity, price, paymentMethod, 
+            additionalInfo, deadline
+        );
     }
 
     // buyer-bank create LC
@@ -136,18 +105,20 @@ contract TradeFinance is Ownable {
             "created",
             startDate
         );
-        emit LcCreated(lcID, salesContractID);
+        emit LcCreated(lcID, salesContractID, "", "", "", "", "created", startDate);
     }
 
     function approveLC(uint lcID) public returns (bool sucess) {
         letterOfCredit storage lc = letterOfCredits[lcID];
         lc.lcStatus = "advising_bank_approved";
+        emit LcApproved(lcID);
         return true;
     }
 
     function rejectLC(uint lcID) public returns (bool sucess) {
         letterOfCredit storage lc = letterOfCredits[lcID];
         lc.lcStatus = "advising_bank_rejected";
+        emit LcRejected(lcID);
         return true;
     }
 
@@ -158,6 +129,7 @@ contract TradeFinance is Ownable {
     ) public returns (bool success) {
         letterOfCredit storage lc = letterOfCredits[lcID];
         lc.lcStatus = status;
+        emit LcStatusChanged(lcID, lc.lcStatus);
         return true;
     }
 
@@ -173,6 +145,7 @@ contract TradeFinance is Ownable {
         lc.billOfExchangeHash = exchange;
         lc.billOfLadingHash = lading;
         lc.otherDocHash = other;
+        emit DocUploaded(lcID, invoice, exchange, lading, other);
         return true;
     }
 }
